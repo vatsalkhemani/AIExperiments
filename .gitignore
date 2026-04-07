@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+chroma_db/
+frames/
+.DS_Store
+*.tmp
