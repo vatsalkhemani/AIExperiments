@@ -1,16 +1,18 @@
 # Multimodal RAG
 
-Exploring what becomes possible when your embedding model natively understands images, video, audio, and PDFs, not just text.
+RAG over images, video, audio, and PDFs using Gemini Embedding 2. No OCR, no transcription, no captioning. Files go in as raw bytes and get embedded directly into a single vector space.
 
-## The problem
+## How it works
 
-Traditional RAG over non-text content requires converting everything to text first. OCR your PDFs, transcribe your audio, caption your images, describe your video frames, then embed the text. Every conversion step is lossy. A chart becomes a text description that misses spatial relationships. An audio clip loses tone and non-speech sounds. A video frame loses everything the captioning model didn't mention. You end up searching over degraded proxies of the original content.
+**Input:** Upload any mix of files (images, videos up to 2 min, audio up to 80s, PDFs up to 6 pages, text)
 
-## What this project does
+The system:
+- Reads each file as raw bytes and embeds it directly using `gemini-embedding-2-preview`
+- Stores all vectors in one ChromaDB collection, all modalities sharing the same space
+- Embeds your text query with the same model, retrieves the top 5 most similar files by cosine distance
+- Passes the actual retrieved files (not text descriptions) to `gemini-3.1-flash-lite-preview` for answer generation
 
-Uses Google's Gemini Embedding 2 (`gemini-embedding-2-preview`) to embed files directly as raw bytes. Images, videos, audio, PDFs, and text all go into the same vector space with no intermediate conversion. A text query retrieves the most relevant content regardless of its original modality. Retrieved files are then passed to Gemini 3.1 Flash Lite for grounded answer generation.
-
-Upload a mix of files, index them, and ask questions across all of it through a chat interface.
+**Output:** Grounded answers referencing specific files, with similarity scores and source previews
 
 ## Stack
 
@@ -36,19 +38,17 @@ cp .env.example .env
 streamlit run app.py
 ```
 
-Upload files through the sidebar (images, videos up to 2 min, audio up to 80s, PDFs up to 6 pages, text files), click "Index all files", then ask questions in the chat.
-
 ## Structure
 
 ```
 multimodal-rag/
 ├── app.py              # Streamlit interface
 ├── config.py           # Models, limits, supported types
-├── index.py            # Direct multimodal embedding and ChromaDB indexing
-├── retrieve.py         # Query, retrieval, and grounded generation
+├── index.py            # Multimodal embedding and ChromaDB indexing
+├── retrieve.py         # Retrieval and grounded generation
 ├── requirements.txt
 ├── .env.example
 └── TECHNICAL.md
 ```
 
-For architecture decisions, design rationale, and learnings, see [TECHNICAL.md](./TECHNICAL.md).
+For architecture decisions and what I learned, see [TECHNICAL.md](./TECHNICAL.md).
