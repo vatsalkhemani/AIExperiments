@@ -8,7 +8,7 @@ Traditional RAG over non-text content requires converting everything to text fir
 
 ## What this project does
 
-Uses Google's Gemini Embedding 2 to embed files directly as raw bytes. Images, videos, audio, PDFs, and text all go into the same vector space with no intermediate conversion. A text query retrieves the most relevant content regardless of its original modality.
+Uses Google's Gemini Embedding 2 (`gemini-embedding-2-preview`) to embed files directly as raw bytes. Images, videos, audio, PDFs, and text all go into the same vector space with no intermediate conversion. A text query retrieves the most relevant content regardless of its original modality. Retrieved files are then passed to Gemini 3.1 Flash Lite for grounded answer generation.
 
 Upload a mix of files, index them, and ask questions across all of it through a chat interface.
 
@@ -16,8 +16,8 @@ Upload a mix of files, index them, and ask questions across all of it through a 
 
 | Component | Detail |
 |-----------|--------|
-| Embeddings | Gemini `gemini-embedding-2-preview` (multimodal, 768d) |
-| Generation | Gemini 3.1 Flash Lite |
+| Embeddings | `gemini-embedding-2-preview` (multimodal, 768d) |
+| Generation | `gemini-3.1-flash-lite-preview` (multimodal) |
 | Vector DB | ChromaDB (local, cosine similarity) |
 | UI | Streamlit |
 
@@ -36,6 +36,8 @@ cp .env.example .env
 streamlit run app.py
 ```
 
+Upload files through the sidebar (images, videos up to 2 min, audio up to 80s, PDFs up to 6 pages, text files), click "Index all files", then ask questions in the chat.
+
 ## Structure
 
 ```
@@ -45,7 +47,8 @@ multimodal-rag/
 ├── index.py            # Direct multimodal embedding and ChromaDB indexing
 ├── retrieve.py         # Query, retrieval, and grounded generation
 ├── requirements.txt
-└── TECHNICAL.md        # Architecture decisions and deeper technical context
+├── .env.example
+└── TECHNICAL.md
 ```
 
 For architecture decisions, design rationale, and learnings, see [TECHNICAL.md](./TECHNICAL.md).

@@ -8,17 +8,19 @@ This means a text query like "architecture diagram" can match directly against a
 
 ## How the pipeline works
 
-**Indexing.** Each uploaded file is read as raw bytes and sent directly to the embedding model with its MIME type. The model returns a 768-dimensional vector. That vector and the file metadata go into a single ChromaDB collection. There is no text extraction, no frame extraction, no transcription. The embedding model processes raw content natively.
+**Indexing.** Each uploaded file is read as raw bytes and sent directly to `gemini-embedding-2-preview` with its MIME type. The model returns a 768-dimensional vector. That vector and the file metadata go into a single ChromaDB collection. There is no text extraction, no frame extraction, no transcription. The embedding model processes raw content natively.
 
-**Retrieval.** The user's text query is embedded using the same model into the same vector space. ChromaDB returns the top-K most similar items by cosine distance, regardless of whether they were originally images, audio, video, PDFs, or text.
+**Retrieval.** The user's text query is embedded using the same model into the same vector space. ChromaDB returns the top 5 most similar items by cosine distance, regardless of whether they were originally images, audio, video, PDFs, or text.
 
-**Generation.** Retrieved files (images, PDFs) are passed as raw bytes to Gemini 3.1 Flash Lite alongside the query. The generation model sees the actual content, not a text summary of it. For video and audio, the prompt references the file name since streaming large media inline is impractical.
+**Generation.** Retrieved files (images, PDFs) are passed as raw bytes to `gemini-3.1-flash-lite-preview` alongside the query. Because Flash Lite is a multimodal model, it sees the actual content of the retrieved files, not a text summary. For text files, the raw text is included directly. For video and audio, the prompt references the file name since streaming large media inline is impractical.
 
 ## Design decisions
 
 **No text extraction pipeline.** The entire point of this project is to test whether multimodal embeddings make the traditional "convert everything to text" step unnecessary. If we OCR'd PDFs or captioned images before embedding, we'd be testing text embeddings with extra steps, not multimodal embeddings.
 
 **Single collection for all modalities.** Everything lives in one ChromaDB collection. Retrieval naturally ranks the most semantically relevant content regardless of type. A query about a chart retrieves the chart image, not a transcript that happens to mention charts.
+
+**Multimodal generation model.** Using Gemini 3.1 Flash Lite for generation because it can read images and PDFs natively. A text-only generation model would only see file names, not content. The generation model needs to be multimodal for the same reason the embedding model is: the raw content is what matters.
 
 **Same provider for embedding and generation.** Both use Gemini. The embedding model understands how Gemini "sees" content, so retrieved results align well with what the generation model can reason about.
 
@@ -40,6 +42,7 @@ These are hard limits from the model. Longer videos, larger PDFs, and bigger doc
 ## What I learned
 
 - The conversion pipeline (OCR, captioning, transcription) isn't just extra work, it's an information bottleneck. Multimodal embeddings bypass it entirely and retrieval quality improves because you're matching against the real content, not a text proxy
-- Cross-modal retrieval actually works. A text query finds relevant images without any intermediate text description. This felt like magic the first time it worked
+- Cross-modal retrieval actually works. A text query finds relevant images without any intermediate text description
+- Both the embedding and generation models need to be multimodal for this to work end to end. Multimodal embeddings with a text-only generator means you retrieve the right files but can't read them
 - The model's constraints (120s video, 6-page PDF) mean chunking is still necessary for large content. The model eliminates the *conversion* step, not the *segmentation* step
 - Embedding cost varies dramatically by modality. Video is 60x more expensive per token than text. For large corpora, this matters
