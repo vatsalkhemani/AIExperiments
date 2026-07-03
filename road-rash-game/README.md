@@ -3,6 +3,8 @@
 A Road Rash–inspired 3D motorcycle combat racer that runs entirely in the browser —
 no build step, no install, no network needed (Three.js is bundled in `lib/`).
 
+![Road Clash gameplay screenshot](screenshot.png)
+
 ## What's in it
 
 - **Scenic valley landscape** — a winding ~3.5 km road through procedurally generated
@@ -36,10 +38,16 @@ python3 -m http.server 8000
 
 On touch devices, on-screen buttons appear and the throttle is automatic.
 
-## Tech
+## Tech stack
 
-Single HTML file + [Three.js](https://threejs.org) r160 (vendored in `lib/`, wired up via import map).
-The world is fully procedural: seeded RNG, value-noise terrain with height-based
-coloring, a Catmull-Rom spline track with geometry extruded along it, instanced
-meshes for vegetation, and canvas-generated textures for the road, clouds, and
-banner. No assets to download beyond the Three.js library.
+- **Rendering** — [Three.js](https://threejs.org) r160 (WebGL), vendored in `lib/` and
+  wired up via a native browser import map — no CDN, no bundler.
+- **Language/runtime** — vanilla JavaScript ES modules, loaded straight by the browser.
+  Single `index.html` file: markup, styles, and game logic together.
+- **Audio** — WebAudio API for the speed-reactive engine sound, no audio files.
+- **World generation** — seeded RNG (mulberry32) and value noise drive procedural
+  terrain height/coloring, a Catmull-Rom spline for the track with geometry extruded
+  along it, `InstancedMesh` for vegetation/rocks, and canvas-drawn textures for the
+  road, clouds, and banner.
+- **Tooling** — none. No build step, no package manager, no assets to fetch besides the
+  vendored Three.js library. Any static file server works (see below).
