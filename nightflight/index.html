@@ -124,6 +124,29 @@ const greystone=(function(){ const c=cvs(256,256), g=c.getContext('2d');
   for(let i=0;i<2600;i++){ const v=Math.random()*30-15; g.fillStyle=`rgba(${92+v},${98+v},${110+v},.35)`; g.fillRect(Math.random()*256,Math.random()*256,3,3); }
   return tex(c,{rep:[2.2,2.2]}); })();
 
+// normal map from a canvas heightmap (Sobel) — gives the ashlar real relief
+function normalFromHeight(draw,{w=256,h=256,strength=2.4,rep=[2.2,2.2]}={}){
+  const c=cvs(w,h), g=c.getContext('2d'); draw(g,w,h);
+  const src=g.getImageData(0,0,w,h).data, out=g.createImageData(w,h), o=out.data;
+  const hf=(x,y)=>src[(((y+h)%h)*w+((x+w)%w))*4]/255;
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const dx=(hf(x+1,y)-hf(x-1,y))*strength, dy=(hf(x,y+1)-hf(x,y-1))*strength;
+    const inv=1/Math.sqrt(dx*dx+dy*dy+1), i=(y*w+x)*4;
+    o[i]=Math.round((-dx*inv*.5+.5)*255); o[i+1]=Math.round((dy*inv*.5+.5)*255); o[i+2]=Math.round(inv*255); o[i+3]=255; }
+  g.putImageData(out,0,0);
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(rep[0],rep[1]); return t;
+}
+const stoneNormal=normalFromHeight((g,w,h)=>{
+  g.fillStyle='#555'; g.fillRect(0,0,w,h);
+  const bh=36; let row=0;
+  for(let y=0;y<h;y+=bh){ const off=(row++%2)?32:0;
+    for(let x=-64;x<w;x+=64){ const v=Math.random()*26-13;
+      g.fillStyle=`rgb(${168+v},${168+v},${168+v})`; g.fillRect(x+off+3,y+3,58,bh-6); } }
+  // pitting
+  for(let i=0;i<900;i++){ const v=Math.random()*70; g.fillStyle=`rgba(${90+v},${90+v},${90+v},.5)`;
+    g.beginPath(); g.arc(Math.random()*w,Math.random()*h,Math.random()*2.5+.5,0,7); g.fill(); }
+});
+
 const sandstone=(function(){ const c=cvs(256,256), g=c.getContext('2d');
   g.fillStyle='#8a7048'; g.fillRect(0,0,256,256);
   for(let i=0;i<12000;i++){ const v=Math.random()*50-22; g.fillStyle=`rgba(${150+v},${120+v},${78+v},${Math.random()*.5})`; g.fillRect(Math.random()*256,Math.random()*256,2,2); }
@@ -277,8 +300,8 @@ function terrainH(x,z){
   const geo=new THREE.CircleGeometry(720,96); geo.rotateX(-Math.PI/2);
   const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color:0x070e17, roughness:.1, metalness:.88, transparent:true, opacity:.97}));
   m.position.set(0,2,820); scene.add(m);
-  const glint=new THREE.Sprite(new THREE.SpriteMaterial({map:coolGlow,color:0xdfe9ff,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));
-  glint.scale.set(200,1100,1); glint.position.set(-160,4,700); scene.add(glint);
+  const glint=new THREE.Sprite(new THREE.SpriteMaterial({map:warmGlow,color:0xe8b070,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false}));
+  glint.scale.set(90,380,1); glint.position.set(430,4,300); scene.add(glint);
   // low fog banks drifting over the water
   window.__fogBanks=[];
   for(let i=0;i<10;i++){ const f=new THREE.Sprite(new THREE.SpriteMaterial({map:coolGlow,color:0x111a2c,transparent:true,opacity:.32,depthWrite:false}));
@@ -310,7 +333,7 @@ function terrainH(x,z){
 // CASTLE KIT — greystone masses + one giant InstancedMesh of lit windows
 // ============================================================================
 const colliders=[];   // {t:'b',minx..maxz} boxes and {t:'c',x,z,r,y0,y1} cylinders — solid world
-const stoneM=new THREE.MeshStandardMaterial({map:greystone, roughness:.92, metalness:.03, color:0xa4a9b6});
+const stoneM=new THREE.MeshStandardMaterial({map:greystone, normalMap:stoneNormal, normalScale:new THREE.Vector2(.75,.75), roughness:.92, metalness:.03, color:0xa4a9b6});
 const roofM =new THREE.MeshStandardMaterial({map:roofTex, roughness:.8, metalness:.05, color:0x323a52});
 const winMats=[];           // Matrix4 list for instanced windows
 const winColors=[];         // per-window warm/cool tint
@@ -413,7 +436,7 @@ const candleAnchors=[]; const hallLights=[]; const torchSprites=[];
 
 (function greatHall(){
   const {W,H,L,fy}=HALL, halfW=W/2, halfL=L/2;
-  const wallM=new THREE.MeshStandardMaterial({map:greystone, roughness:.95, metalness:.02, color:0xc2b295, emissive:0x171207, emissiveIntensity:.32});
+  const wallM=new THREE.MeshStandardMaterial({map:greystone, normalMap:stoneNormal, normalScale:new THREE.Vector2(.6,.6), roughness:.95, metalness:.02, color:0xc2b295, emissive:0x241c0e, emissiveIntensity:.5});
   const floorM=new THREE.MeshStandardMaterial({color:0x322718, roughness:.22, metalness:.35});
   const woodM=new THREE.MeshStandardMaterial({color:0x4a2f18, roughness:.6});
 
@@ -504,7 +527,7 @@ const candleAnchors=[]; const hallLights=[]; const torchSprites=[];
   }
   // interior key lights
   for(const [lx,lz] of [[-18,-70],[18,-70],[-18,-20],[18,-20],[-18,30],[18,30],[-18,75],[18,75],[0,-halfL+18]]){
-    const pl=new THREE.PointLight(0xffc98a, 52, 150, 2.0); pl.position.set(lx,fy+28,lz); hallG.add(pl); hallLights.push({l:pl,b:52,ph:Math.random()*7}); }
+    const pl=new THREE.PointLight(0xffc98a, 66, 160, 2.0); pl.position.set(lx,fy+28,lz); hallG.add(pl); hallLights.push({l:pl,b:66,ph:Math.random()*7}); }
 
   window.__vaultMat=vault.material;   // enchanted ceiling mirrors the sky
 
@@ -543,6 +566,26 @@ const candleAnchors=[]; const hallLights=[]; const torchSprites=[];
     plates.count=pi; gobs.count=gi; plats.count=fi;
     plates.instanceMatrix.needsUpdate=gobs.instanceMatrix.needsUpdate=plats.instanceMatrix.needsUpdate=true;
     hallG.add(plates,gobs,plats); }
+
+  // the feast: students on every bench, staff at the high table (instanced)
+  { const NST=4*14*2+5;
+    const bodies=new THREE.InstancedMesh(new THREE.CapsuleGeometry(.55,.95,4,8), new THREE.MeshStandardMaterial({color:0x1a1510,roughness:.92}), NST);
+    const heads=new THREE.InstancedMesh(new THREE.SphereGeometry(.4,8,8), new THREE.MeshStandardMaterial({color:0xffffff,roughness:.85}), NST);
+    const d=new THREE.Object3D(), col=new THREE.Color(); const skins=[0xc9a380,0x8a5f3c,0xe8c39a,0x6b452a,0xd9b08c]; let i3=0;
+    for(let ti=0;ti<4;ti++){ const tx=-W/2+(ti+.9)*(W/4.8);
+      for(let k=0;k<14;k++){ const zk=-64+k*10.2;
+        for(const s2 of [-1,1]){ if(i3>=NST-5) continue;
+          const bx=tx+s2*4.2, bz=zk+(Math.random()-.5)*2.4;
+          d.position.set(bx,fy+3.3,bz); d.rotation.set((Math.random()-.5)*.08,s2>0?-Math.PI/2:Math.PI/2,(Math.random()-.5)*.14); d.updateMatrix(); bodies.setMatrixAt(i3,d.matrix);
+          d.position.set(bx,fy+4.65,bz); d.rotation.set(0,0,0); d.updateMatrix(); heads.setMatrixAt(i3,d.matrix);
+          col.setHex(skins[(i3*7)%5]); heads.setColorAt(i3,col); i3++; } } }
+    for(let s3=0;s3<5;s3++){ const hx=-W/2+12+s3*(W-24)/4;
+      d.position.set(hx,fy+4.1,-halfL+13); d.rotation.set(0,0,0); d.updateMatrix(); bodies.setMatrixAt(i3,d.matrix);
+      d.position.set(hx,fy+5.6,-halfL+13); d.updateMatrix(); heads.setMatrixAt(i3,d.matrix);
+      col.setHex(skins[s3%5]); heads.setColorAt(i3,col); i3++; }
+    bodies.count=heads.count=i3; bodies.instanceMatrix.needsUpdate=heads.instanceMatrix.needsUpdate=true;
+    if(heads.instanceColor) heads.instanceColor.needsUpdate=true;
+    hallG.add(bodies,heads); }
 
   // solid geometry — the hall pushes back (world-space, hall centred at z=zC)
   const zC=HALL.zC;
@@ -793,7 +836,7 @@ xmasTree(30, PLA, 52, 19);
 function classroom(cx,cz){
   const W2=26, D2=34, H2=13, doorW2=11, doorH2=10.5;
   const g=new THREE.Group(); g.position.set(cx,PLA,cz); scene.add(g);
-  const wallM2=new THREE.MeshStandardMaterial({map:greystone, color:0xbfb098, roughness:.95});
+  const wallM2=new THREE.MeshStandardMaterial({map:greystone, normalMap:stoneNormal, normalScale:new THREE.Vector2(.6,.6), color:0xbfb098, roughness:.95});
   const woodM2=new THREE.MeshStandardMaterial({color:0x4a3218, roughness:.7});
   const floor2=new THREE.Mesh(new THREE.BoxGeometry(W2,1,D2), new THREE.MeshStandardMaterial({color:0x2e2417,roughness:.5,metalness:.2})); floor2.position.y=.5; g.add(floor2);
   const ceil2=new THREE.Mesh(new THREE.BoxGeometry(W2,1,D2), wallM2); ceil2.position.y=H2; g.add(ceil2);
@@ -951,15 +994,23 @@ document.getElementById('go').addEventListener('click', ()=>{
 // ============================================================================
 // Animate
 // ============================================================================
-// day-night palettes (night → dawn → golden morning)
-const C_=(h)=>new THREE.Color(h);
-const SKY_T=[C_(0x04050e),C_(0x2a2246),C_(0x3a5e97)], SKY_M=[C_(0x0d1734),C_(0x6a4a66),C_(0x7c98c8)], SKY_B=[C_(0x1a2a50),C_(0xc97b4a),C_(0xe8c9a0)];
-const FOG_C=[C_(0x0a1024),C_(0x4a3a50),C_(0x93a7c4)];
-const VAULT_E=[C_(0x4a6ac0),C_(0x8a7aa8),C_(0xaac8ee)];
-const SUN_LO=C_(0xff9a56), SUN_HI=C_(0xffe8c0);
-const _mx=new THREE.Color(), _v1=new THREE.Vector3();
-function mix3(arr,k){ if(k<.5) _mx.copy(arr[0]).lerp(arr[1],k*2); else _mx.copy(arr[1]).lerp(arr[2],(k-.5)*2); return _mx; }
-const DAYP=300;   // seconds for a full night→day→night cycle
+// ---- perpetual golden hour: one hand-tuned sunset, applied once ----
+const SUNDIR=new THREE.Vector3(.62,.17,.52).normalize();   // low SE sun — lights the lake-facing facades
+(function sunsetLighting(){
+  window.__skyU.top.value.setHex(0x232a55); window.__skyU.mid.value.setHex(0x6a5378); window.__skyU.bot.value.setHex(0xe0985e);
+  scene.fog.color.setHex(0x46405e); scene.fog.density=.00062;
+  sun.color.setHex(0xffb875); sun.intensity=2.35;
+  sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+  { const sc2=sun.shadow.camera; sc2.near=200; sc2.far=6000; sc2.left=sc2.bottom=-1200; sc2.right=sc2.top=1200; sun.shadow.bias=-0.0005; }
+  moon.castShadow=false; moon.intensity=.85;                     // cool fill from the north-west
+  sunHalo.material.opacity=.85;
+  if(window.__stars) window.__stars.uniforms.fade.value=.35;
+  if(window.__moonHalo) window.__moonHalo.material.opacity=.25;
+  hemi.intensity=1.25; amb.intensity=.62; scene.fog.density=.00052;
+  if(window.__winMat) window.__winMat.color.setScalar(.92);
+  if(window.__vaultMat){ window.__vaultMat.emissive.setHex(0x7a6ab0); window.__vaultMat.emissiveIntensity=1.7; }
+  bloom.strength=.55;
+})();
 
 const clock=new THREE.Clock();
 const cp=cGeo.attributes.position.array, cf=cGeo.attributes.flick.array;
@@ -995,24 +1046,9 @@ function tick(){
     sm2.s.position.set(B[0]+Math.sin(t*.7+sm2.i)*1.4*(f/26+.3), B[1]+f, B[2]+Math.cos(t*.5+sm2.i)*1.2);
     sm2.s.material.opacity=.3*(1-f/26); sm2.s.scale.setScalar(3+f*.35); } }
 
-  // --- the sun cycle: night → dawn → golden morning → night ---
-  const day=.5-.5*Math.cos(((t%DAYP)/DAYP)*Math.PI*2);
-  window.__skyU.top.value.copy(mix3(SKY_T,day)); window.__skyU.mid.value.copy(mix3(SKY_M,day)); window.__skyU.bot.value.copy(mix3(SKY_B,day));
-  scene.fog.color.copy(mix3(FOG_C,day)); scene.fog.density=.00085-.00025*day;
-  const elev=-.32+day*1.0, sE=Math.max(0,Math.sin(elev));
-  const sunDir=_v1.set(Math.cos(elev)*.92, Math.sin(elev), -.39).normalize();
-  sun.position.copy(rig.position).addScaledVector(sunDir,2500); sun.target.position.copy(rig.position);
-  sun.intensity=3.2*sE; sun.color.copy(SUN_LO).lerp(SUN_HI, Math.min(1,sE*2));
-  sunDisc.position.copy(rig.position).addScaledVector(sunDir,7600); sunHalo.position.copy(sunDisc.position);
-  sunHalo.material.opacity=Math.min(.95,sE*2.2);
-  moon.intensity=2.6*(1-day*.82)+.12;
-  if(window.__stars) window.__stars.uniforms.fade.value=1-day*.92;
-  if(window.__moonHalo) window.__moonHalo.material.opacity=.9*(1-day*.85);
-  hemi.intensity=.72+day*1.1; amb.intensity=.38+day*.5;
-  if(window.__winMat) window.__winMat.color.setScalar(1-day*.78);
-  if(window.__vaultMat){ window.__vaultMat.emissive.copy(mix3(VAULT_E,day)); window.__vaultMat.emissiveIntensity=1.5+day*1.1; }
-  if(window.__flameMats&&window.__flameMats.length>1){ window.__flameMats[0].uniforms.dim.value=.7*(1-day*.3); window.__flameMats[1].uniforms.dim.value=.26*(1-day*.3); }
-  bloom.strength=.7-.32*day;
+  // golden-hour key light + sun disc follow the flyer (keeps shadows crisp)
+  sun.position.copy(rig.position).addScaledVector(SUNDIR,2500); sun.target.position.copy(rig.position);
+  sunDisc.position.copy(rig.position).addScaledVector(SUNDIR,7600); sunHalo.position.copy(sunDisc.position);
 
   if(st.flying){
     let rollT=0;
